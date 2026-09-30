@@ -1,21 +1,8 @@
-import { Fraunces, Manrope } from "next/font/google";
 import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { readStore } from "@/lib/db";
 import { unreadCount } from "@/lib/workflow";
 import "./globals.css";
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Relay — Client contract workflows",
@@ -36,7 +23,7 @@ export default async function RootLayout({
   const unread = unreadCount(store, currentUser.id);
 
   return (
-    <html lang="en" className={`${fraunces.variable} ${manrope.variable} h-full`}>
+    <html lang="en" className="h-full">
       <body className="min-h-full antialiased">
         <AppShell
           users={store.users}

@@ -20,8 +20,12 @@
   --warning: #a67c2d;
   --shadow: 0 18px 50px rgba(28, 36, 34, 0.08);
   --radius: 18px;
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
-  --font-body: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  /* Aptos is Microsoft’s UI font (Windows 11 / Microsoft 365). */
+  --font-aptos: Aptos, "Aptos Display", "Segoe UI", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-display: "Aptos Display", Aptos, "Segoe UI", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-body: var(--font-aptos);
 }
 
 @theme inline {
@@ -83,6 +87,8 @@ textarea {
 
 .font-display {
   font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .surface {
