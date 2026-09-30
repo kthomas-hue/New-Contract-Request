@@ -51,7 +51,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3 stagger">
+      <section className="grid gap-4 sm:grid-cols-3 stagger">
         <Stat
           icon={<ClipboardCheck className="h-5 w-5" />}
           label="Waiting on you"
@@ -66,7 +66,7 @@ export default async function HomePage() {
         />
         <Stat
           icon={<Settings2 className="h-5 w-5" />}
-          label="Configured clients"
+          label="Clients configured"
           value={String(store.clients.length)}
           href="/admin"
         />
