@@ -4,11 +4,12 @@ import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { readStore, resetStore, updateStore } from "./db";
-import type {
-  Client,
-  FormField,
-  WorkflowStep,
-} from "./types";
+import {
+  buildClientFromTemplate,
+  cloneClientRecord,
+  type ClientTemplateId,
+} from "./templates";
+import type { Client, FormField, WorkflowStep } from "./types";
 import {
   addActivity,
   currentStep,
@@ -61,73 +62,60 @@ export async function createClient(formData: FormData) {
   const name = String(formData.get("name") ?? "");
   const description = String(formData.get("description") ?? "");
   const accent = String(formData.get("accent") ?? "#1F6F6B");
-  const id = nanoid(8);
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+  const template = String(
+    formData.get("template") ?? "simple_approval",
+  ) as ClientTemplateId;
+
+  const client = buildClientFromTemplate({
+    name,
+    description,
+    accent,
+    template,
+  });
 
   await updateStore((store) => {
-    const client: Client = {
-      id,
-      name: name.trim(),
-      slug: slug || id,
-      description: description.trim() || "",
-      accent: accent || "#1F6F6B",
-      roles: [
-        { id: "role-submitter", name: "Requester", color: "#3D6B8C" },
-        { id: "role-approver", name: "Approver", color: "#C46B3A" },
-        { id: "role-contracts", name: "Contracts", color: "#1F6F6B" },
-      ],
-      formFields: [
-        {
-          id: "candidate_name",
-          label: "Candidate name",
-          type: "text",
-          required: true,
-        },
-        {
-          id: "job_title",
-          label: "Job title",
-          type: "text",
-          required: true,
-        },
-      ],
-      workflowSteps: [
-        {
-          id: nanoid(8),
-          name: "Approver review",
-          type: "approval",
-          description: "Review and approve the request",
-          assigneeRoleId: "role-approver",
-          allowEdit: true,
-          allowComment: true,
-          allowUpload: false,
-          canRequestChanges: false,
-          notifyOnEnter: [
-            {
-              id: nanoid(6),
-              roleId: "role-approver",
-              message: "A new request needs your approval.",
-            },
-          ],
-          notifyOnComplete: [
-            {
-              id: nanoid(6),
-              roleId: "role-submitter",
-              message: "Your request was approved.",
-            },
-          ],
-        },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
     store.clients.push(client);
     return store;
   });
   revalidateAll();
-  redirect(`/admin/clients/${id}`);
+  redirect(`/admin/clients/${client.id}`);
+}
+
+export async function cloneClient(formData: FormData) {
+  const sourceId = String(formData.get("sourceId") ?? "");
+  const name = String(formData.get("name") ?? "");
+  let newId = "";
+
+  await updateStore((store) => {
+    const source = getClient(store, sourceId);
+    if (!source) throw new Error("Client not found");
+    const copy = cloneClientRecord(source, name || `${source.name} copy`);
+    store.clients.push(copy);
+    newId = copy.id;
+    return store;
+  });
+
+  revalidateAll();
+  redirect(`/admin/clients/${newId}`);
+}
+
+export async function savePeopleAssignments(
+  clientId: string,
+  assignments: Record<string, string[]>,
+) {
+  await updateStore((store) => {
+    for (const user of store.users) {
+      const roles = assignments[user.id];
+      if (roles === undefined) continue;
+      if (!roles.length) {
+        delete user.clientRoles[clientId];
+      } else {
+        user.clientRoles[clientId] = roles;
+      }
+    }
+    return store;
+  });
+  revalidateAll();
 }
 
 export async function updateClientMeta(
@@ -422,18 +410,46 @@ export async function declineStep(requestId: string, comment: string) {
       message: `${actor.name} declined — ${step.name}`,
     });
 
-    request.status = "declined";
-    request.currentAssigneeIds = [];
+    const declineAction = step.declineAction ?? "end";
+    if (declineAction === "previous" && request.currentStepIndex > 0) {
+      request.currentStepIndex -= 1;
+      const previous = request.workflowSteps[request.currentStepIndex];
+      request.currentAssigneeIds = resolveStepAssignees(
+        store,
+        request.clientId,
+        previous,
+      );
+      request.status = "in_progress";
+      addActivity(request, {
+        kind: "step_started",
+        userId: actor.id,
+        stepId: previous.id,
+        message: `Sent back to ${previous.name}`,
+      });
+      pushNotifications(
+        store,
+        [
+          request.submitterId,
+          ...request.currentAssigneeIds,
+        ],
+        `${request.reference}: Sent back`,
+        comment.trim() ||
+          `${step.name} was declined and sent back to ${previous.name}.`,
+        request.id,
+      );
+    } else {
+      request.status = "declined";
+      request.currentAssigneeIds = [];
+      pushNotifications(
+        store,
+        [request.submitterId],
+        `${request.reference}: Declined`,
+        comment.trim() || "Your request was declined.",
+        request.id,
+      );
+    }
+
     request.updatedAt = new Date().toISOString();
-
-    pushNotifications(
-      store,
-      [request.submitterId],
-      `${request.reference}: Declined`,
-      comment.trim() || "Your request was declined.",
-      request.id,
-    );
-
     return store;
   });
   revalidateAll();

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx -e \"import { resetStore } from './src/lib/db.ts'; await resetStore(); console.log('Seeded');\""
+    "seed": "tsx -e \"import { resetStore } from './src/lib/db.ts'; await resetStore(); console.log('Seeded');\"",
+    "test:e2e": "tsx scripts/e2e-workflow.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -2,9 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { nanoid } from "nanoid";
-import { Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import { saveWorkflowSteps } from "@/lib/actions";
-import type { ClientRole, NotifyTarget, StepType, WorkflowStep } from "@/lib/types";
+import type {
+  ClientRole,
+  DeclineAction,
+  NotifyTarget,
+  StepType,
+  User,
+  WorkflowStep,
+} from "@/lib/types";
 import { stepTypeLabel } from "@/lib/workflow";
 
 const STEP_TYPES: StepType[] = [
@@ -26,10 +33,12 @@ function emptyStep(): WorkflowStep {
     type: "approval",
     description: "",
     assigneeRoleId: "",
+    assigneeUserIds: [],
     allowEdit: false,
     allowComment: true,
     allowUpload: false,
     canRequestChanges: false,
+    declineAction: "end",
     notifyOnEnter: [],
     notifyOnComplete: [],
   };
@@ -39,14 +48,23 @@ export function WorkflowDesigner({
   clientId,
   initialSteps,
   roles,
+  users,
 }: {
   clientId: string;
   initialSteps: WorkflowStep[];
   roles: ClientRole[];
+  users: User[];
 }) {
-  const [steps, setSteps] = useState(initialSteps);
+  const [steps, setSteps] = useState<WorkflowStep[]>(
+    initialSteps.map((s) => ({
+      ...s,
+      declineAction: s.declineAction ?? "end",
+      assigneeUserIds: s.assigneeUserIds ?? [],
+    })),
+  );
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const clientUsers = users.filter((u) => u.clientRoles[clientId]?.length);
 
   function updateStep(id: string, patch: Partial<WorkflowStep>) {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -74,14 +92,38 @@ export function WorkflowDesigner({
     setSaved(false);
   }
 
+  function duplicateStep(id: string) {
+    setSteps((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx < 0) return prev;
+      const copy: WorkflowStep = {
+        ...structuredClone(prev[idx]),
+        id: nanoid(8),
+        name: `${prev[idx].name} (copy)`,
+        notifyOnEnter: prev[idx].notifyOnEnter.map((n) => ({
+          ...n,
+          id: nanoid(6),
+        })),
+        notifyOnComplete: prev[idx].notifyOnComplete.map((n) => ({
+          ...n,
+          id: nanoid(6),
+        })),
+      };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+    setSaved(false);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl">Workflow</h2>
           <p className="text-sm text-muted">
-            Build the approval path for this client — who acts, what they can do,
-            and who gets notified.
+            Compose any path — assignees, capabilities, decline behaviour, and
+            notifications.
           </p>
         </div>
         <div className="flex gap-2">
@@ -160,6 +202,14 @@ export function WorkflowDesigner({
                 </button>
                 <button
                   type="button"
+                  className="btn btn-ghost px-2 py-1 text-xs"
+                  onClick={() => duplicateStep(step.id)}
+                  title="Duplicate step"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
                   className="btn btn-ghost px-2 py-1 text-danger"
                   onClick={() => {
                     setSteps((prev) => prev.filter((s) => s.id !== step.id));
@@ -212,6 +262,20 @@ export function WorkflowDesigner({
                   ))}
                 </select>
               </div>
+              <div className="field">
+                <label>If declined</label>
+                <select
+                  value={step.declineAction ?? "end"}
+                  onChange={(e) =>
+                    updateStep(step.id, {
+                      declineAction: e.target.value as DeclineAction,
+                    })
+                  }
+                >
+                  <option value="end">End the request</option>
+                  <option value="previous">Send back one step</option>
+                </select>
+              </div>
               <div className="field sm:col-span-2">
                 <label>Description</label>
                 <textarea
@@ -220,6 +284,42 @@ export function WorkflowDesigner({
                     updateStep(step.id, { description: e.target.value })
                   }
                 />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-2 text-sm font-semibold">
+                Also assign specific people (optional)
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {clientUsers.map((u) => {
+                  const checked = (step.assigneeUserIds ?? []).includes(u.id);
+                  return (
+                    <label
+                      key={u.id}
+                      className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const current = step.assigneeUserIds ?? [];
+                          updateStep(step.id, {
+                            assigneeUserIds: e.target.checked
+                              ? [...current, u.id]
+                              : current.filter((id) => id !== u.id),
+                          });
+                        }}
+                      />
+                      {u.name}
+                    </label>
+                  );
+                })}
+                {!clientUsers.length ? (
+                  <p className="text-xs text-muted sm:col-span-2">
+                    Assign people to roles first, then they appear here.
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -251,7 +351,10 @@ export function WorkflowDesigner({
                 ["notifyOnComplete", "Notify when step completes"],
               ] as const
             ).map(([key, title]) => (
-              <div key={key} className="mt-5 rounded-2xl border border-line bg-paper/60 p-4">
+              <div
+                key={key}
+                className="mt-5 rounded-2xl border border-line bg-paper/60 p-4"
+              >
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="text-sm font-semibold">{title}</h4>
                   <button
@@ -310,7 +413,9 @@ export function WorkflowDesigner({
                     </div>
                   ))}
                   {!step[key].length ? (
-                    <p className="text-xs text-muted">No notifications configured.</p>
+                    <p className="text-xs text-muted">
+                      No notifications configured.
+                    </p>
                   ) : null}
                 </div>
               </div>

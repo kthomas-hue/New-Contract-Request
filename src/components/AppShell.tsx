@@ -17,6 +17,7 @@ import { cn, initials } from "@/lib/utils";
 const nav = [
   { href: "/", label: "Home", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: ClipboardList },
+  { href: "/requests", label: "Requests", icon: ClipboardList },
   { href: "/requests/new", label: "New request", icon: PlusCircle },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/admin", label: "Admin", icon: Settings2 },
@@ -56,7 +57,9 @@ export function AppShell({
               const active =
                 item.href === "/"
                   ? pathname === "/"
-                  : pathname.startsWith(item.href);
+                  : item.href === "/requests"
+                    ? pathname === "/requests"
+                    : pathname.startsWith(item.href);
               const Icon = item.icon;
               return (
                 <Link
@@ -120,7 +123,9 @@ export function AppShell({
             const active =
               item.href === "/"
                 ? pathname === "/"
-                : pathname.startsWith(item.href);
+                : item.href === "/requests"
+                  ? pathname === "/requests"
+                  : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

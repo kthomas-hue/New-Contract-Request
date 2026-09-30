@@ -4,9 +4,13 @@ export type FieldType =
   | "number"
   | "date"
   | "select"
+  | "multiselect"
   | "email"
+  | "phone"
+  | "url"
   | "currency"
-  | "checkbox";
+  | "checkbox"
+  | "section";
 
 export type StepType =
   | "approval"
@@ -14,6 +18,10 @@ export type StepType =
   | "document_review"
   | "issue"
   | "signed";
+
+export type DeclineAction = "end" | "previous";
+
+export type FieldWidth = "half" | "full";
 
 export type RequestStatus =
   | "draft"
@@ -45,6 +53,8 @@ export interface FormField {
   options?: string[];
   placeholder?: string;
   helpText?: string;
+  defaultValue?: string;
+  width?: FieldWidth;
 }
 
 export interface NotifyTarget {
@@ -65,6 +75,8 @@ export interface WorkflowStep {
   allowComment: boolean;
   allowUpload: boolean;
   canRequestChanges: boolean;
+  /** What happens if the step is declined */
+  declineAction: DeclineAction;
   notifyOnEnter: NotifyTarget[];
   notifyOnComplete: NotifyTarget[];
 }

@@ -62,11 +62,14 @@ export function resolveStepAssignees(
   clientId: string,
   step: WorkflowStep,
 ): string[] {
-  if (step.assigneeUserIds?.length) return [...step.assigneeUserIds];
+  const ids = new Set<string>();
+  for (const uid of step.assigneeUserIds ?? []) ids.add(uid);
   if (step.assigneeRoleId) {
-    return usersForRole(store, clientId, step.assigneeRoleId).map((u) => u.id);
+    for (const u of usersForRole(store, clientId, step.assigneeRoleId)) {
+      ids.add(u.id);
+    }
   }
-  return [];
+  return [...ids];
 }
 
 export function pushNotifications(

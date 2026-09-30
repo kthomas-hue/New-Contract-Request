@@ -7,13 +7,17 @@ import { saveFormFields } from "@/lib/actions";
 import type { FieldType, FormField } from "@/lib/types";
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
+  { value: "section", label: "Section heading" },
   { value: "text", label: "Text" },
   { value: "textarea", label: "Long text" },
   { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "url", label: "URL" },
   { value: "number", label: "Number" },
   { value: "currency", label: "Currency" },
   { value: "date", label: "Date" },
   { value: "select", label: "Dropdown" },
+  { value: "multiselect", label: "Multi-select" },
   { value: "checkbox", label: "Checkbox" },
 ];
 
@@ -33,15 +37,23 @@ export function FormDesigner({
     setSaved(false);
   }
 
-  function addField() {
+  function addField(type: FieldType = "text") {
     setFields((prev) => [
       ...prev,
       {
-        id: nanoid(8),
-        label: "New field",
-        type: "text",
-        required: false,
+        id: type === "section" ? `section_${nanoid(6)}` : nanoid(8),
+        label: type === "section" ? "Section" : "New field",
+        type,
+        required: type !== "section" && type !== "checkbox",
         placeholder: "",
+        width:
+          type === "section" || type === "textarea" || type === "multiselect"
+            ? "full"
+            : "half",
+        options:
+          type === "select" || type === "multiselect"
+            ? ["Option A", "Option B"]
+            : undefined,
       },
     ]);
     setSaved(false);
@@ -71,12 +83,19 @@ export function FormDesigner({
         <div>
           <h2 className="font-display text-2xl">Request form</h2>
           <p className="text-sm text-muted">
-            Design the fields requesters fill in for this client.
+            Build any intake form — sections, selects, money, dates, and more.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button type="button" className="btn btn-secondary" onClick={addField}>
-            <Plus className="h-4 w-4" /> Add field
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => addField("section")}
+          >
+            <Plus className="h-4 w-4" /> Section
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => addField()}>
+            <Plus className="h-4 w-4" /> Field
           </button>
           <button
             type="button"
@@ -96,15 +115,12 @@ export function FormDesigner({
 
       <div className="space-y-3 stagger">
         {fields.map((field) => (
-          <div
-            key={field.id}
-            className="surface rounded-2xl p-4"
-          >
+          <div key={field.id} className="surface rounded-2xl p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-muted">
                 <GripVertical className="h-4 w-4" />
                 <span className="text-xs font-semibold uppercase tracking-wide">
-                  Field
+                  {field.type === "section" ? "Section" : "Field"}
                 </span>
               </div>
               <div className="flex gap-1">
@@ -143,9 +159,25 @@ export function FormDesigner({
                 <label>Type</label>
                 <select
                   value={field.type}
-                  onChange={(e) =>
-                    updateField(field.id, { type: e.target.value as FieldType })
-                  }
+                  onChange={(e) => {
+                    const type = e.target.value as FieldType;
+                    updateField(field.id, {
+                      type,
+                      required: type !== "section" && type !== "checkbox" ? field.required : false,
+                      width:
+                        type === "section" ||
+                        type === "textarea" ||
+                        type === "multiselect"
+                          ? "full"
+                          : field.width ?? "half",
+                      options:
+                        type === "select" || type === "multiselect"
+                          ? field.options?.length
+                            ? field.options
+                            : ["Option A", "Option B"]
+                          : undefined,
+                    });
+                  }}
                 >
                   {FIELD_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -154,15 +186,42 @@ export function FormDesigner({
                   ))}
                 </select>
               </div>
-              <div className="field">
-                <label>Placeholder</label>
-                <input
-                  value={field.placeholder ?? ""}
-                  onChange={(e) =>
-                    updateField(field.id, { placeholder: e.target.value })
-                  }
-                />
-              </div>
+              {field.type !== "section" ? (
+                <>
+                  <div className="field">
+                    <label>Placeholder</label>
+                    <input
+                      value={field.placeholder ?? ""}
+                      onChange={(e) =>
+                        updateField(field.id, { placeholder: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Default value</label>
+                    <input
+                      value={field.defaultValue ?? ""}
+                      onChange={(e) =>
+                        updateField(field.id, { defaultValue: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Width</label>
+                    <select
+                      value={field.width ?? "half"}
+                      onChange={(e) =>
+                        updateField(field.id, {
+                          width: e.target.value as "half" | "full",
+                        })
+                      }
+                    >
+                      <option value="half">Half</option>
+                      <option value="full">Full</option>
+                    </select>
+                  </div>
+                </>
+              ) : null}
               <div className="field">
                 <label>Help text</label>
                 <input
@@ -172,7 +231,7 @@ export function FormDesigner({
                   }
                 />
               </div>
-              {field.type === "select" ? (
+              {field.type === "select" || field.type === "multiselect" ? (
                 <div className="field sm:col-span-2">
                   <label>Options (comma separated)</label>
                   <input
@@ -188,16 +247,18 @@ export function FormDesigner({
                   />
                 </div>
               ) : null}
-              <label className="inline-flex items-center gap-2 text-sm font-semibold text-ink-soft">
-                <input
-                  type="checkbox"
-                  checked={field.required}
-                  onChange={(e) =>
-                    updateField(field.id, { required: e.target.checked })
-                  }
-                />
-                Required
-              </label>
+              {field.type !== "section" ? (
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-ink-soft">
+                  <input
+                    type="checkbox"
+                    checked={field.required}
+                    onChange={(e) =>
+                      updateField(field.id, { required: e.target.checked })
+                    }
+                  />
+                  Required
+                </label>
+              ) : null}
             </div>
           </div>
         ))}

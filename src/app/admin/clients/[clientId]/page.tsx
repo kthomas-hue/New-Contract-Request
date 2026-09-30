@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FormDesigner } from "@/components/FormDesigner";
+import { RoleDesigner } from "@/components/RoleDesigner";
 import { WorkflowDesigner } from "@/components/WorkflowDesigner";
 import { WorkflowPreview } from "@/components/WorkflowTimeline";
 import { updateClientMeta } from "@/lib/actions";
@@ -22,7 +23,7 @@ export default async function ClientAdminPage({
   const tabs = [
     { id: "workflow", label: "Workflow" },
     { id: "form", label: "Form" },
-    { id: "roles", label: "Roles" },
+    { id: "roles", label: "Roles & people" },
     { id: "settings", label: "Settings" },
   ] as const;
 
@@ -66,6 +67,7 @@ export default async function ClientAdminPage({
             clientId={client.id}
             initialSteps={client.workflowSteps}
             roles={client.roles}
+            users={store.users}
           />
           <aside className="surface h-fit rounded-[var(--radius)] p-5">
             <h3 className="font-display text-lg">Preview</h3>
@@ -82,39 +84,11 @@ export default async function ClientAdminPage({
       ) : null}
 
       {tab === "roles" ? (
-        <section className="surface rounded-[var(--radius)] p-5">
-          <h2 className="font-display text-2xl">Roles</h2>
-          <p className="mt-1 text-sm text-muted">
-            Roles are used to assign workflow steps and route notifications.
-            Demo people are already mapped to these roles.
-          </p>
-          <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-            {client.roles.map((role) => (
-              <li
-                key={role.id}
-                className="rounded-2xl border border-line bg-white/70 p-4"
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ background: role.color }}
-                  />
-                  <p className="font-semibold">{role.name}</p>
-                </div>
-                <p className="mt-2 text-sm text-muted">
-                  {role.description || "No description"}
-                </p>
-                <p className="mt-3 text-xs text-muted">
-                  People:{" "}
-                  {store.users
-                    .filter((u) => u.clientRoles[client.id]?.includes(role.id))
-                    .map((u) => u.name)
-                    .join(", ") || "None assigned"}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <RoleDesigner
+          clientId={client.id}
+          initialRoles={client.roles}
+          users={store.users}
+        />
       ) : null}
 
       {tab === "settings" ? (

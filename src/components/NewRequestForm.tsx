@@ -3,7 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import { submitRequest } from "@/lib/actions";
 import type { Client } from "@/lib/types";
-import { FormRenderer, formDataToValues } from "@/components/FormRenderer";
+import {
+  FormRenderer,
+  formDataToValues,
+  validateRequiredFields,
+} from "@/components/FormRenderer";
 import { WorkflowPreview } from "@/components/WorkflowTimeline";
 
 export function NewRequestForm({ clients }: { clients: Client[] }) {
@@ -51,17 +55,10 @@ export function NewRequestForm({ clients }: { clients: Client[] }) {
               setError(null);
               const formData = new FormData(e.currentTarget);
               const values = formDataToValues(client.formFields, formData);
-
-              for (const field of client.formFields) {
-                if (
-                  field.required &&
-                  (values[field.id] === undefined ||
-                    values[field.id] === "" ||
-                    values[field.id] === false)
-                ) {
-                  setError(`Please complete: ${field.label}`);
-                  return;
-                }
+              const missing = validateRequiredFields(client.formFields, values);
+              if (missing) {
+                setError(missing);
+                return;
               }
 
               startTransition(async () => {

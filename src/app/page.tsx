@@ -38,7 +38,10 @@ export default async function HomePage() {
             submission to signature with the right people notified at every step.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/requests/new" className="btn bg-white text-brand-deep hover:bg-brand-soft">
+            <Link
+              href="/requests/new"
+              className="btn bg-white font-semibold text-brand-deep hover:bg-brand-soft"
+            >
               Start a request <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
