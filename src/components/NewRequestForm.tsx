@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { submitRequest } from "@/lib/actions";
 import type { Client } from "@/lib/types";
-import { FormRenderer } from "@/components/FormRenderer";
+import { FormRenderer, formDataToValues } from "@/components/FormRenderer";
 import { WorkflowPreview } from "@/components/WorkflowTimeline";
 
 export function NewRequestForm({ clients }: { clients: Client[] }) {
@@ -12,16 +12,14 @@ export function NewRequestForm({ clients }: { clients: Client[] }) {
     () => clients.find((c) => c.id === clientId),
     [clients, clientId],
   );
-  const [values, setValues] = useState<Record<string, string | number | boolean>>(
-    {},
-  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   function onClientChange(id: string) {
     setClientId(id);
-    setValues({});
     setError(null);
+    setFormKey((k) => k + 1);
   }
 
   return (
@@ -47,32 +45,38 @@ export function NewRequestForm({ clients }: { clients: Client[] }) {
 
         {client ? (
           <form
+            key={`${client.id}-${formKey}`}
             onSubmit={(e) => {
               e.preventDefault();
               setError(null);
+              const formData = new FormData(e.currentTarget);
+              const values = formDataToValues(client.formFields, formData);
+
               for (const field of client.formFields) {
-                if (field.required && (values[field.id] === undefined || values[field.id] === "")) {
+                if (
+                  field.required &&
+                  (values[field.id] === undefined ||
+                    values[field.id] === "" ||
+                    values[field.id] === false)
+                ) {
                   setError(`Please complete: ${field.label}`);
                   return;
                 }
               }
+
               startTransition(async () => {
                 try {
                   await submitRequest({ clientId: client.id, formData: values });
                 } catch (err) {
-                  setError(err instanceof Error ? err.message : "Failed to submit");
+                  setError(
+                    err instanceof Error ? err.message : "Failed to submit",
+                  );
                 }
               });
             }}
             className="space-y-5"
           >
-            <FormRenderer
-              fields={client.formFields}
-              values={values}
-              onChange={(id, value) =>
-                setValues((prev) => ({ ...prev, [id]: value }))
-              }
-            />
+            <FormRenderer fields={client.formFields} nativeForm />
             {error ? (
               <p className="rounded-xl bg-danger-soft px-3 py-2 text-sm text-danger">
                 {error}
